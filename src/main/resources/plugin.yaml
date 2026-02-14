@@ -4,16 +4,16 @@ metadata:
   name: editor-emoji
 spec:
   enabled: true
-  requires: ">=2.21.0"
+  requires: ">=2.22.0"
   author:
     name: Halo
     website: https://github.com/halo-sigs
   logo: icon.svg
-  homepage: https://github.com/halo-sigs/editor-emoji#readme
-  repo: https://github.com/halo-sigs/editor-emoji
-  issues: https://github.com/halo-sigs/editor-emoji/issues
+  homepage: https://github.com/halo-sigs/plugin-editor-emoji#readme
+  repo: https://github.com/halo-sigs/plugin-editor-emoji
+  issues: https://github.com/halo-sigs/plugin-editor-emoji/issues
   displayName: "Emoji 表情选择器"
   description: "支持在编辑器中唤起 Emoji 表情选择器"
   license:
     - name: "GPL-3.0"
-      url: "https://github.com/halo-sigs/editor-emoji/blob/main/LICENSE"
+      url: "https://github.com/halo-sigs/plugin-editor-emoji/blob/main/LICENSE"
