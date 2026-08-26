@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import type { Editor } from '@halo-dev/richtext-editor'
-import type { EmojiItem } from '@tiptap/extension-emoji'
-import { computed, ref, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { emojiCategories, type EmojiCategory } from './emojiData'
+import type { EmojiItem } from './emojiExtension'
 
 const props = defineProps<{
   command: (item: EmojiItem) => void
@@ -20,8 +20,7 @@ interface Position {
   column: number
 }
 
-const selectedPosition = ref<Position>({ categoryIndex: 0, row: 0, column: 0 })
-const isLoading = ref(false)
+const selectedPosition = shallowRef<Position>({ categoryIndex: 0, row: 0, column: 0 })
 
 const searchEmojisByCategory = (query: string, showAllOnEmpty = false): EmojiCategory[] => {
   const trimmedQuery = query.trim()
@@ -301,15 +300,11 @@ const scrollToSelected = () => {
   }
 }
 
-watch(
-  selectedPosition,
-  () => {
-    setTimeout(() => {
-      scrollToSelected()
-    }, 0)
-  },
-  { deep: true },
-)
+watch(selectedPosition, () => {
+  setTimeout(() => {
+    scrollToSelected()
+  }, 0)
+})
 
 defineExpose({
   onKeyDown,
@@ -318,10 +313,7 @@ defineExpose({
 
 <template>
   <div class="emoji-picker">
-    <div v-if="isLoading" class="emoji-picker-loading">
-      <span>加载中...</span>
-    </div>
-    <div v-else-if="categoriesWithEmojis.length === 0" class="emoji-picker-empty">
+    <div v-if="categoriesWithEmojis.length === 0" class="emoji-picker-empty">
       <span>未找到 emoji</span>
     </div>
     <div v-else class="emoji-picker-content">

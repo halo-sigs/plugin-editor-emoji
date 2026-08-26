@@ -3,7 +3,7 @@ plugins {
     id "com.github.node-gradle.node" version "7.1.0"
 }
 
-group 'run.halo.editoremoji.ui'
+group = 'run.halo.editoremoji.ui'
 
 tasks.register('pnpmBuild', PnpmTask) {
     group = 'build'
@@ -11,6 +11,7 @@ tasks.register('pnpmBuild', PnpmTask) {
     args = ['build']
     dependsOn tasks.named('pnpmInstall')
     inputs.dir(layout.projectDirectory.dir('src'))
+    inputs.dir(layout.projectDirectory.dir('scripts'))
     inputs.files(fileTree(
         dir: layout.projectDirectory,
         includes: ['*.cjs', '*.ts', '*.js', '*.json', '*.yaml']))

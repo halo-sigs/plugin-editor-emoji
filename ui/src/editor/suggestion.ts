@@ -1,11 +1,11 @@
-import { computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { VueRenderer } from '@halo-dev/richtext-editor'
-import type { EmojiItem } from '@tiptap/extension-emoji'
-import type { SuggestionOptions } from '@tiptap/suggestion'
 import type { ExtendedEmojiStorage } from '.'
-import EmojiPicker from './EmojiPicker.vue'
+import type { EmojiItem } from './emojiExtension'
+import type { EmojiSuggestionOptions, EmojiSuggestionProps } from './emojiSuggestionPlugin'
 
-export const createEmojiSuggestion = (): Omit<SuggestionOptions<EmojiItem>, 'editor'> => {
+const loadEmojiPicker = () => Promise.all([import('@floating-ui/dom'), import('./EmojiPicker.vue')])
+
+export const createEmojiSuggestion = (): Omit<EmojiSuggestionOptions<EmojiItem>, 'editor'> => {
   return {
     char: ':',
 
@@ -16,78 +16,97 @@ export const createEmojiSuggestion = (): Omit<SuggestionOptions<EmojiItem>, 'edi
     allow: ({ state, range }) => {
       const $from = state.doc.resolve(range.from)
       const type = state.schema.nodes.emoji
-      return !!$from.parent.type.contentMatch.matchType(type)
+      return !!type && !!$from.parent.type.contentMatch.matchType(type)
     },
 
     render: () => {
-      let component: VueRenderer
+      let component: VueRenderer | undefined
       let popup: HTMLElement | null = null
+      let latestProps: EmojiSuggestionProps<EmojiItem> | undefined
+      let loadToken = 0
+      let showAllOnEmpty = false
+      let positionPopup: ((clientRect: (() => DOMRect | null) | null) => Promise<void>) | undefined
 
-      const updatePosition = async (clientRect: (() => DOMRect | null) | null) => {
-        if (!popup) {
+      const destroyPopup = () => {
+        popup?.remove()
+        component?.destroy()
+        popup = null
+        component = undefined
+        positionPopup = undefined
+      }
+
+      const mountPopup = async (token: number) => {
+        const [{ computePosition, flip, offset, shift }, { default: EmojiPicker }] =
+          await loadEmojiPicker()
+
+        if (token !== loadToken || !latestProps) {
           return
         }
 
-        if (!clientRect) {
-          return
+        const props = latestProps
+
+        positionPopup = async (clientRect) => {
+          if (!popup || !clientRect) {
+            return
+          }
+
+          const rect = clientRect()
+          if (!rect) {
+            return
+          }
+
+          const { x, y } = await computePosition({ getBoundingClientRect: () => rect }, popup, {
+            placement: 'bottom-start',
+            middleware: [offset(8), flip(), shift({ padding: 8 })],
+          })
+
+          Object.assign(popup.style, {
+            left: `${x}px`,
+            top: `${y}px`,
+          })
         }
 
-        const rect = clientRect()
-        if (!rect) {
-          return
-        }
-
-        const virtualElement = {
-          getBoundingClientRect: () => rect,
-        }
-
-        const { x, y } = await computePosition(virtualElement, popup, {
-          placement: 'bottom-start',
-          middleware: [offset(8), flip(), shift({ padding: 8 })],
+        component = new VueRenderer(EmojiPicker, {
+          props: {
+            ...props,
+            editor: props.editor,
+            showAllOnEmpty,
+          },
+          editor: props.editor,
         })
 
+        popup = component.element as HTMLElement
         Object.assign(popup.style, {
-          left: `${x}px`,
-          top: `${y}px`,
+          position: 'absolute',
+          zIndex: '9999',
+          display: props.query || showAllOnEmpty ? 'block' : 'none',
         })
+        document.body.appendChild(popup)
+
+        if (props.clientRect && (props.query || showAllOnEmpty)) {
+          await positionPopup(props.clientRect)
+        }
       }
 
       return {
         onStart: (props) => {
           const emojiStorage = props.editor.storage.emoji as ExtendedEmojiStorage | undefined
-          const showAllOnEmpty = emojiStorage?.commandMenuTriggered || false
-
-          component = new VueRenderer(EmojiPicker, {
-            props: {
-              ...props,
-              editor: props.editor,
-              showAllOnEmpty,
-            },
-            editor: props.editor,
+          showAllOnEmpty = emojiStorage?.commandMenuTriggered || false
+          latestProps = props
+          destroyPopup()
+          const token = ++loadToken
+          void mountPopup(token).catch((error) => {
+            if (token === loadToken) {
+              console.error('Failed to load the emoji picker', error)
+            }
           })
-
-          popup = component.element as HTMLElement
-
-          Object.assign(popup.style, {
-            position: 'absolute',
-            zIndex: '9999',
-            display: showAllOnEmpty ? 'block' : 'none',
-          })
-
-          document.body.appendChild(popup)
-
-          if (props.clientRect && showAllOnEmpty) {
-            updatePosition(props.clientRect)
-          }
         },
 
         onUpdate(props) {
+          latestProps = props
           if (!popup || !component) {
             return
           }
-
-          const emojiStorage = props.editor.storage.emoji as ExtendedEmojiStorage | undefined
-          const showAllOnEmpty = emojiStorage?.commandMenuTriggered || false
 
           if (!props.query && !showAllOnEmpty) {
             popup.style.display = 'none'
@@ -101,13 +120,22 @@ export const createEmojiSuggestion = (): Omit<SuggestionOptions<EmojiItem>, 'edi
             showAllOnEmpty,
           })
 
-          if (props.clientRect) {
-            updatePosition(props.clientRect)
+          if (props.clientRect && positionPopup) {
+            void positionPopup(props.clientRect)
           }
         },
 
         onKeyDown(props) {
-          if (!popup || popup.style.display === 'none') {
+          if (!popup) {
+            if (props.event.key === 'Escape') {
+              latestProps = undefined
+              loadToken += 1
+              return true
+            }
+            return false
+          }
+
+          if (popup.style.display === 'none') {
             return false
           }
 
@@ -118,16 +146,14 @@ export const createEmojiSuggestion = (): Omit<SuggestionOptions<EmojiItem>, 'edi
             return true
           }
 
-          return component.ref?.onKeyDown?.(props.event) || false
+          return component?.ref?.onKeyDown?.(props.event) || false
         },
 
         onExit() {
-          if (popup) {
-            popup.remove()
-          }
-          if (component) {
-            component.destroy()
-          }
+          latestProps = undefined
+          showAllOnEmpty = false
+          loadToken += 1
+          destroyPopup()
         },
       }
     },

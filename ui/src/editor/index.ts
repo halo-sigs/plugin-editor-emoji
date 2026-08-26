@@ -1,8 +1,8 @@
 import type { Editor, ExtensionOptions, Range } from '@halo-dev/richtext-editor'
-import TipTapEmoji, { type EmojiOptions, type EmojiStorage } from '@tiptap/extension-emoji'
 import { markRaw } from 'vue'
 import StreamlineColorSmileyEmojiTerrified from '~icons/streamline-color/smiley-emoji-terrified'
 import { tipTapEmojis } from './emojiData'
+import TipTapEmoji, { type EmojiOptions, type EmojiStorage } from './emojiExtension'
 import { createEmojiSuggestion } from './suggestion'
 
 export interface ExtendedEmojiStorage {
